@@ -8,6 +8,7 @@ Guerra's method extension to conclude about polarization thanks to antagonism be
   source('polarization.R')
   
 2. Use the code
+
 2.1 With igraph library :
 - Build your graph.
 - Use a community detection algorithm.
