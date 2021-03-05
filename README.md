@@ -16,7 +16,7 @@ Guerra's method extension to conclude about polarization thanks to antagonism be
 - Call the function graph_polarization(your_graph, community_membership, weight_attr_name = your_weight_attr_name)
 - Use the returned indicatives ($antagonism_matrix, $boundaries, $internals, $porosity)
 
-2.2 Withtout igraph library :
+2.2 Without igraph library :
 - Build your graph's adjacency list.
 - Use a community detection algorithm.
 - Extract community membership for each vertex.
