@@ -13,25 +13,25 @@ build_structural_matrix <- function(community_count, vertex_count, adjacency_lis
   
   # Detect Internals
   for(v in 1:vertex_count) {
-    community_v = community_membership[v]
-    structural_matrix[v, community_v] = 3
-    for(neighbor in adjacency_list[v]) {
-      community_neighbor = community_membership[neighbor]
-      if(community_v != community_neighbor) structural_matrix[v, community_neighbor] = 1
+    community_v = community_membership[[v]]
+    for(neighbor in adjacency_list[[v]]) {
+      community_neighbor = community_membership[[neighbor]]
+      structural_matrix[[v, community_v]] = 3
+      if(community_v != community_neighbor) structural_matrix[[v, community_neighbor]] = 1
     }
   }
   
   # Detect Boundaries
   for(v in 1:vertex_count) {
-    community_v = community_membership[v]
+    community_v = community_membership[[v]]
     external_neighbors = vector()
     internal_neighbors = vector()
-    for(neighbor in adjacency_list[v]) {
-      community_neighbor = community_membership[neighbor]
+    for(neighbor in adjacency_list[[v]]) {
+      community_neighbor = community_membership[[neighbor]]
       if(community_v != community_neighbor) external_neighbors = c(external_neighbors, community_neighbor)
       else internal_neighbors = c(internal_neighbors, match(0, structural_matrix[neighbor,]))
     }
-    for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[v, community] = 2
+    for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[[v, community]] = 2
   }
   
   return (structural_matrix)
@@ -61,22 +61,22 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   else formula <- formula_for_weighted
   
   for(v in 1:nrow(structural_matrix)) {
-    community_i = community_membership[v]
+    community_i = community_membership[[v]]
     communities_j = match(2, structural_matrix[v,])
     if(!is.na(communities_j)) for(community_j in communities_j) {
       Ebv = 0
       Eiv = 0
-      for(neighbor in adjacency_list[v])
-        if(community_membership[neighbor] == community_j) Ebv = formula(Ebv, adjacency_matrix, v, neighbor)
-      else if(community_membership[neighbor] == community_i && structural_matrix[neighbor,community_j] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
+      for(neighbor in adjacency_list[[v]])
+        if(community_membership[[neighbor]] == community_j) Ebv = formula(Ebv, adjacency_matrix, v, neighbor)
+      else if(community_membership[[neighbor]] == community_i && structural_matrix[neighbor,community_j] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
       
-      antagonism_matrix[community_i, community_j] = antagonism_matrix[community_i, community_j] + (Eiv/(Eiv+Ebv) - 0.5)
-      boundaries_count[community_i, community_j] = boundaries_count[community_i, community_j] + 1
-      boundaries = rbind(boundaries, data.frame(vertex = v, degree = length(adjacency_list[v]), community_vertex = communities_names[community_i], other_community = communities_names[community_j], Pv = (Eiv/(Eiv+Ebv) - 0.5)))
+      antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
+      boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
+      boundaries = rbind(boundaries, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[community_j], Pv = (Eiv/(Eiv+Ebv) - 0.5)))
     }
     
     vertices_internals = match(0, structural_matrix[v,])
-    if(!is.na(vertices_internals)) for(intern in vertices_internals) internals = rbind(internals, data.frame(vertex = v, degree = length(adjacency_list[v]), community_vertex = communities_names[community_i], other_community = communities_names[intern]))
+    if(!is.na(vertices_internals)) for(intern in vertices_internals) internals = rbind(internals, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[intern]))
   }
   
   return (list(boundaries = boundaries, internals = internals, antagonism_matrix = (antagonism_matrix / ifelse(boundaries_count==0, 1, boundaries_count))))
@@ -89,22 +89,22 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
 #' 
 #' @return A data frame with for each community its porosity value
 porosity = function(boundaries, community_membership) {
-    percent = function(number_double) { return (paste(round(number_double * 100), "%", sep=''))}
-    communities = names(sort(table(community_membership), decreasing = TRUE))
-    res = data.frame()
-    
-    for(communauty in communities) {
-        n = p = 0
-        lines = boundaries[which(boundaries$community_vertex == communauty),]
-        if(nrow(lines) > 0) for(i in 1:nrow(lines)) {
-            line = lines[i,]
-            if(line$Pv <= 0) n = n+1
-            else p = p+1
-        }
-        res = rbind(res, data.frame("community" = communauty, "porosity" = percent(as.double(n/(n+p)))))
+  percent = function(number_double) { return (paste(round(number_double * 100), "%", sep=''))}
+  communities = names(sort(table(community_membership), decreasing = TRUE))
+  res = data.frame()
+  
+  for(communauty in communities) {
+    n = p = 0
+    lines = boundaries[which(boundaries$community_vertex == communauty),]
+    if(nrow(lines) > 0) for(i in 1:nrow(lines)) {
+      line = lines[i,]
+      if(line$Pv <= 0) n = n+1
+      else p = p+1
     }
-    
-    return (res)
+    res = rbind(res, data.frame("community" = communauty, "porosity" = percent(as.double(n/(n+p)))))
+  }
+  
+  return (res)
 }
 
 #' Return indicatives to conclude about polarization on a graph
@@ -148,7 +148,7 @@ graph_polarization <- function(graph, community_membership = NULL, adjacency_mat
   adjacency_list = as_adj_list(graph, mode = "out")
   if(is.weighted(graph)) adjacency_matrix = as_adjacency_matrix(graph, attr = weight_attr_name)
   if(is.null(community_membership)) community_membership = membership(graph)
-      
+  
   # Build antagonism matrix and boundaries
   res_object = polarization(adjacency_list, community_membership, adjacency_matrix)
   
