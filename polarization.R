@@ -5,33 +5,48 @@ library(igraph)
 #' @param community_count Number of communities in the graph
 #' @param vertex_count Number of vertices in the graph
 #' @param adjacency_list Graph's adjacency list
-#' @param community_membership A list with for each vertex of the graph its community's index
+#' @param community_members A list with for each vertex of the graph its community's index
 #' 
 #' @return The structural matrix
-build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_membership) {
-  structural_matrix = matrix(0, nrow = vertex_count, ncol = community_count)
+build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_members) {
+  if(!is.list(community_members)) community_membership = as.list(community_members)
+  else community_membership = community_members
+  structural_matrix = matrix(list(0), nrow = vertex_count, ncol = community_count)
   
   # Detect Internals
   for(v in 1:vertex_count) {
-    community_v = community_membership[[v]]
-    for(neighbor in adjacency_list[[v]]) {
-      community_neighbor = community_membership[[neighbor]]
-      structural_matrix[[v, community_v]] = 3
-      if(community_v != community_neighbor) structural_matrix[[v, community_neighbor]] = 1
+    communities_v = community_membership[[v]]
+    for(cv in 1:length(communities_v)) {
+      community_v = communities_v[[cv]]
+      for(neighbor in adjacency_list[[v]]) {
+        communities_neighbor = community_membership[[neighbor]]
+        for(cn in 1:length(communities_neighbor)) {
+          community_neighbor = communities_neighbor[[cn]]
+          structural_matrix[[v, community_v]][[cv]] = 3
+          if(community_v != community_neighbor) structural_matrix[[v, community_neighbor]][[cv]] = 1
+        }
+      }
     }
   }
   
   # Detect Boundaries
   for(v in 1:vertex_count) {
-    community_v = community_membership[[v]]
-    external_neighbors = vector()
-    internal_neighbors = vector()
-    for(neighbor in adjacency_list[[v]]) {
-      community_neighbor = community_membership[[neighbor]]
-      if(community_v != community_neighbor) external_neighbors = c(external_neighbors, community_neighbor)
-      else internal_neighbors = c(internal_neighbors, match(0, structural_matrix[neighbor,]))
+    communities_v = community_membership[[v]]
+    for(cv in 1:length(communities_v)) {
+      community_v = communities_v[[cv]]
+      external_neighbors = vector()
+      internal_neighbors = vector()
+      for(neighbor in adjacency_list[[v]]) {
+        communities_neighbor = community_membership[[neighbor]]
+        for(cn in 1:length(communities_neighbor)) {
+          community_neighbor = communities_neighbor[[cn]]
+          if(community_v != community_neighbor) external_neighbors = c(external_neighbors, community_neighbor)
+          else 
+            for(co in 1:length(structural_matrix[neighbor,])) if(structural_matrix[neighbor,][[co]][[cn]] == 0) internal_neighbors = c(internal_neighbors, co)
+        }
+      }
+      for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[[v, community]][[cv]] = 2
     }
-    for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[[v, community]] = 2
   }
   
   return (structural_matrix)
