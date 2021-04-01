@@ -4,13 +4,13 @@ library(igraph)
 #' 
 #' @param community_count Number of communities in the graph
 #' @param vertex_count Number of vertices in the graph
-#' @param adjacency_list Graph's adjacency list
-#' @param community_members A list with for each vertex of the graph its community's index
+#' @param adjacency_list Graph's adjacency list (with igraph's adj_list format)
+#' @param community_membership A list with for each vertex of the graph its community's index (as.list)
 #' 
 #' @return The structural matrix
-build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_members) {
-  if(!is.list(community_members)) community_membership = as.list(community_members)
-  else community_membership = community_members
+build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_membership) {
+  #if(!is.list(community_members)) community_membership = as.list(community_members)
+  #else community_membership = community_members
   structural_matrix = matrix(list(0), nrow = vertex_count, ncol = community_count)
   
   # Detect Internals
@@ -18,11 +18,11 @@ build_structural_matrix <- function(community_count, vertex_count, adjacency_lis
     communities_v = community_membership[[v]]
     for(cv in 1:length(communities_v)) {
       community_v = communities_v[[cv]]
+      structural_matrix[[v, community_v]][[cv]] = 3
       for(neighbor in adjacency_list[[v]]) {
         communities_neighbor = community_membership[[neighbor]]
         for(cn in 1:length(communities_neighbor)) {
           community_neighbor = communities_neighbor[[cn]]
-          structural_matrix[[v, community_v]][[cv]] = 3
           if(community_v != community_neighbor) structural_matrix[[v, community_neighbor]][[cv]] = 1
         }
       }
@@ -135,7 +135,7 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   community_count = length(size_communities)
   communities_names = names(size_communities)
   
-  c_membership = sapply(community_membership, function(x) which(communities_names == x))
+  c_membership = lapply(community_membership, function(x) which(communities_names == x))
   
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
