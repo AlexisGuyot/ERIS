@@ -76,7 +76,6 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   else formula <- formula_for_weighted
   
   for(v in 1:nrow(structural_matrix)) {
-    print(v)
     communities_i = community_membership[[v]]
     for(ci in 1:length(communities_i)) {
       community_i = communities_i[[ci]]
@@ -88,7 +87,6 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
         else if(structural_matrix[[v,c]][[ci]] == 0) vertices_internals = c(vertices_internals, c)
           
       if(length(communities_j) > 0) for(community_j in communities_j) {
-        print(community_j)
         Ebv = 0
         Eiv = 0
         for(neighbor in adjacency_list[[v]])
@@ -98,8 +96,6 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
             if(length(index) > 0 && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
           }
         
-        print(Eiv)
-        print(Ebv)
         antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
         boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
         boundaries = rbind(boundaries, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[community_j], Pv = (Eiv/(Eiv+Ebv) - 0.5)))
@@ -107,7 +103,6 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
       
       if(length(vertices_internals) > 0) for(intern in vertices_internals) internals = rbind(internals, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[intern]))
     }
-    print("")
   }
   
   return (list(boundaries = boundaries, internals = internals, antagonism_matrix = (antagonism_matrix / ifelse(boundaries_count==0, 1, boundaries_count))))
@@ -121,7 +116,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
 #' @return A data frame with for each community its porosity value
 porosity = function(boundaries, community_membership) {
   percent = function(number_double) { return (paste(round(number_double * 100), "%", sep=''))}
-  communities = names(sort(table(community_membership), decreasing = TRUE))
+  communities = names(sort(table(unlist(community_membership)), decreasing = TRUE))
   res = data.frame()
   
   for(communauty in communities) {
@@ -151,7 +146,13 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   community_count = length(size_communities)
   communities_names = names(size_communities)
   
-  c_membership = lapply(community_membership, function(x) which(communities_names == x))
+  apply_temporary_names <- function(x) { 
+    tmp = integer()
+    for(xx in 1:length(x)) tmp[[xx]] = as.integer(which(communities_names == x[[xx]]))
+    print(tmp)
+  }
+  c_membership = lapply(community_membership, apply_temporary_names)
+  print(c_membership)
 
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
