@@ -65,32 +65,37 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   formula_for_weighted <- function(x, adjacency_matrix, source, target) { return (x + adjacency_matrix[source, target]) }
   formula_for_unweighted <- function(x, adjacency_matrix, source, target) { return (x+1) }  
   
+  # Structural Matrix content analysis
   internals_size = boundaries_size = 0
   int = bound = 1
   for(elt in structural_matrix) for(value in unlist(elt)) 
     if(value == 0) internals_size = internals_size + 1
     else if(value == 2) boundaries_size = boundaries_size + 1
 
+  # Structures initialization
   antagonism_matrix <- matrix(0, nrow = community_count, ncol = community_count)
   boundaries_count <- matrix(0, nrow = community_count, ncol = community_count)
   boundaries <- matrix(nrow = boundaries_size, ncol = 5, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community", "Pv")))
   internals <- matrix(nrow = internals_size, ncol = 4, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community")))
 
+  # Formula choice (with or whithout weight)
   formula <- NULL
   if(is.null(adjacency_matrix)) formula <- formula_for_unweighted
   else formula <- formula_for_weighted
   
+  # Antagonism matrix build
   for(v in 1:nrow(structural_matrix)) {
     communities_i = community_membership[[v]]
-
     for(ci in 1:length(communities_i)) {
       community_i = communities_i[[ci]]
       communities_j = numeric()
       
+      # Structural matrix reading
       for(c in 1:length(structural_matrix[v,])) 
         if(structural_matrix[[v,c]][[ci]] == 2) communities_j = c(communities_j, c)
         else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], c); int = int + 1 }
 
+      # Eiv and Ebv calculations
       if(length(communities_j) > 0) for(community_j in communities_j) {
         Ebv = 0
         Eiv = 0
@@ -101,6 +106,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
             if(!is.na(index) && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
           }
 
+        # Antagonism calculation
         antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
         boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
         boundaries[bound,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[community_j], (Eiv/(Eiv+Ebv) - 0.5)); bound = bound + 1
