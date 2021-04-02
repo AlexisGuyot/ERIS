@@ -29,7 +29,7 @@ build_structural_matrix <- function(community_count, vertex_count, adjacency_lis
     for(neighbor in adjacency_list[[v]]) {
       community_neighbor = community_membership[[neighbor]]
       if(community_v != community_neighbor) external_neighbors = c(external_neighbors, community_neighbor)
-      else internal_neighbors = c(internal_neighbors, match(0, structural_matrix[neighbor,]))
+      else internal_neighbors = c(internal_neighbors, which(structural_matrix[neighbor,] == 0))
     }
     for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[[v, community]] = 2
   }
@@ -124,7 +124,7 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
-  
+
   # Build antagonism matrix
   res_object = build_antagonism_matrix(structural_matrix, adjacency_list, adjacency_matrix, c_membership, community_count, communities_names)
   colnames(res_object$antagonism_matrix) = communities_names
