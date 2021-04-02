@@ -9,8 +9,6 @@ library(igraph)
 #' 
 #' @return The structural matrix
 build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_membership) {
-  #if(!is.list(community_members)) community_membership = as.list(community_members)
-  #else community_membership = community_members
   structural_matrix = matrix(list(0), nrow = vertex_count, ncol = community_count)
   
   # Detect Internals
@@ -18,6 +16,7 @@ build_structural_matrix <- function(community_count, vertex_count, adjacency_lis
     communities_v = community_membership[[v]]
     for(cv in 1:length(communities_v)) {
       community_v = communities_v[[cv]]
+      if(cv > 1) for(c in 1:community_count) structural_matrix[[v,c]][[cv]] = 0
       structural_matrix[[v, community_v]][[cv]] = 3
       for(neighbor in adjacency_list[[v]]) {
         communities_neighbor = community_membership[[neighbor]]
@@ -82,6 +81,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
       
       communities_j = numeric()
       vertices_internals = numeric()
+      
       for(c in 1:length(structural_matrix[v,])) 
         if(structural_matrix[[v,c]][[ci]] == 2) communities_j = c(communities_j, c)
         else if(structural_matrix[[v,c]][[ci]] == 0) vertices_internals = c(vertices_internals, c)
@@ -95,7 +95,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
             index = which(community_membership[[neighbor]] == community_i)
             if(length(index) > 0 && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
           }
-        
+
         antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
         boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
         boundaries = rbind(boundaries, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[community_j], Pv = (Eiv/(Eiv+Ebv) - 0.5)))
@@ -119,15 +119,16 @@ porosity = function(boundaries, community_membership) {
   communities = names(sort(table(unlist(community_membership)), decreasing = TRUE))
   res = data.frame()
   
-  for(communauty in communities) {
+  for(community in communities) {
     n = p = 0
-    lines = boundaries[which(boundaries$community_vertex == communauty),]
+    lines = boundaries[which(boundaries$community_vertex == community),]
     if(nrow(lines) > 0) for(i in 1:nrow(lines)) {
       line = lines[i,]
       if(line$Pv <= 0) n = n+1
       else p = p+1
     }
-    res = rbind(res, data.frame("community" = communauty, "porosity" = percent(as.double(n/(n+p)))))
+    if(n != 0 || p != 0) score = as.double(n/(n+p)) else score = 0
+    res = rbind(res, data.frame("community" = community, "porosity" = percent(score)))
   }
   
   return (res)
@@ -146,24 +147,17 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   community_count = length(size_communities)
   communities_names = names(size_communities)
   
-  apply_temporary_names <- function(x) { 
-    tmp = integer()
-    for(xx in 1:length(x)) tmp[[xx]] = as.integer(which(communities_names == x[[xx]]))
-    print(tmp)
-  }
+  apply_temporary_names <- function(x) {  tmp = integer(); for(xx in 1:length(x)) tmp[[xx]] = as.integer(which(communities_names == x[[xx]])); return (tmp) }
   c_membership = lapply(community_membership, apply_temporary_names)
-  print(c_membership)
 
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
-  print(structural_matrix)
-  
+
   # Build antagonism matrix
   res_object = build_antagonism_matrix(structural_matrix, adjacency_list, adjacency_matrix, c_membership, community_count, communities_names)
   colnames(res_object$antagonism_matrix) = communities_names
   rownames(res_object$antagonism_matrix) = communities_names
-  print(res_object)
-  
+
   # Calculate porosity
   res_object$porosity = porosity(res_object$boundaries, community_membership)
   
