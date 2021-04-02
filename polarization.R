@@ -125,9 +125,15 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
 #' @return A data frame with for each community its porosity value
 porosity = function(boundaries, community_membership) {
   percent = function(number_double) { return (paste(round(number_double * 100), "%", sep=''))}
-  communities = names(sort(table(unlist(community_membership)), decreasing = TRUE))
+  distinct = function(dataframe, columns) { return (dataframe[!duplicated(dataframe[,columns]),]) }
+  
+  # Sizes analysis
+  communities_sizes = table(unlist(community_membership))
+  boundaries_sizes = table(distinct(boundaries, c('vertex', "community_vertex"))$community_vertex)
+  communities = names(communities_sizes)
   res = data.frame()
   
+  # Porosity calculation
   for(community in communities) {
     n = p = 0
     lines = boundaries[which(boundaries$community_vertex == community),]
@@ -137,8 +143,15 @@ porosity = function(boundaries, community_membership) {
       else p = p+1
     }
     if(n != 0 || p != 0) score = as.double(n/(n+p)) else score = 0
-    res = rbind(res, data.frame("community" = community, "porosity" = percent(score)))
+    if(communities_sizes[[community]] > 0 && community <= length(boundaries_sizes)) boundary_size = boundaries_sizes[[community]]/communities_sizes[[community]]
+    else boundary_size = 0
+    res = rbind(res, data.frame("community" = community, "community_size" = communities_sizes[[community]], "boundary_size" = boundary_size, "porosity" = score))
   }
+  
+  # Result shaping
+  res = res[order(res$porosity),]
+  res$boundary_size = sapply(res$boundary_size, percent)
+  res$porosity = sapply(res$porosity, percent)
   
   return (res)
 }
