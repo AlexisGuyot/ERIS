@@ -41,7 +41,7 @@ build_structural_matrix <- function(community_count, vertex_count, adjacency_lis
           community_neighbor = communities_neighbor[[cn]]
           if(community_v != community_neighbor) external_neighbors = c(external_neighbors, community_neighbor)
           else 
-            for(co in 1:length(structural_matrix[neighbor,])) if(structural_matrix[neighbor,][[co]][[cn]] == 0) internal_neighbors = c(internal_neighbors, co)
+            for(co in 1:length(structural_matrix[neighbor,])) if(structural_matrix[[neighbor,co]][[cn]] == 0) internal_neighbors = c(internal_neighbors, co)
         }
       }
       for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[[v, community]][[cv]] = 2
@@ -65,47 +65,50 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   formula_for_weighted <- function(x, adjacency_matrix, source, target) { return (x + adjacency_matrix[source, target]) }
   formula_for_unweighted <- function(x, adjacency_matrix, source, target) { return (x+1) }  
   
+  internals_size = boundaries_size = 0
+  int = bound = 1
+  for(elt in structural_matrix) for(value in unlist(elt)) 
+    if(value == 0) internals_size = internals_size + 1
+    else if(value == 2) boundaries_size = boundaries_size + 1
+
   antagonism_matrix <- matrix(0, nrow = community_count, ncol = community_count)
   boundaries_count <- matrix(0, nrow = community_count, ncol = community_count)
-  boundaries <- data.frame()
-  internals <- data.frame()
-  
+  boundaries <- matrix(nrow = boundaries_size, ncol = 5, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community", "Pv")))
+  internals <- matrix(nrow = internals_size, ncol = 4, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community")))
+
   formula <- NULL
   if(is.null(adjacency_matrix)) formula <- formula_for_unweighted
   else formula <- formula_for_weighted
   
   for(v in 1:nrow(structural_matrix)) {
     communities_i = community_membership[[v]]
+
     for(ci in 1:length(communities_i)) {
       community_i = communities_i[[ci]]
-      
       communities_j = numeric()
-      vertices_internals = numeric()
       
       for(c in 1:length(structural_matrix[v,])) 
         if(structural_matrix[[v,c]][[ci]] == 2) communities_j = c(communities_j, c)
-        else if(structural_matrix[[v,c]][[ci]] == 0) vertices_internals = c(vertices_internals, c)
-          
+        else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], c); int = int + 1 }
+
       if(length(communities_j) > 0) for(community_j in communities_j) {
         Ebv = 0
         Eiv = 0
         for(neighbor in adjacency_list[[v]])
           if(community_j %in% community_membership[[neighbor]]) Ebv = formula(Ebv, adjacency_matrix, v, neighbor)
           else {
-            index = which(community_membership[[neighbor]] == community_i)
-            if(length(index) > 0 && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
+            index = match(community_i, community_membership[[neighbor]])
+            if(!is.na(index) && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
           }
 
         antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
         boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
-        boundaries = rbind(boundaries, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[community_j], Pv = (Eiv/(Eiv+Ebv) - 0.5)))
+        boundaries[bound,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[community_j], (Eiv/(Eiv+Ebv) - 0.5)); bound = bound + 1
       }
-      
-      if(length(vertices_internals) > 0) for(intern in vertices_internals) internals = rbind(internals, data.frame(vertex = v, degree = length(adjacency_list[[v]]), community_vertex = communities_names[community_i], other_community = communities_names[intern]))
     }
   }
   
-  return (list(boundaries = boundaries, internals = internals, antagonism_matrix = (antagonism_matrix / ifelse(boundaries_count==0, 1, boundaries_count))))
+  return (list(boundaries = as.data.frame(boundaries), internals = as.data.frame(internals), antagonism_matrix = (antagonism_matrix / ifelse(boundaries_count==0, 1, boundaries_count))))
 }
 
 #' Calculate the porosity of the boundaries
@@ -124,7 +127,7 @@ porosity = function(boundaries, community_membership) {
     lines = boundaries[which(boundaries$community_vertex == community),]
     if(nrow(lines) > 0) for(i in 1:nrow(lines)) {
       line = lines[i,]
-      if(line$Pv <= 0) n = n+1
+      if(as.numeric(as.character(line$Pv)) <= 0) n = n+1
       else p = p+1
     }
     if(n != 0 || p != 0) score = as.double(n/(n+p)) else score = 0
