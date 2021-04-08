@@ -11,8 +11,11 @@ library(igraph)
 build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_membership) {
   structural_matrix = matrix(0, nrow = vertex_count, ncol = community_count)
   
+  print("Debut Internals")
+  
   # Detect Internals
   for(v in 1:vertex_count) {
+    if(v %% 1000 == 0) print(sprintf("%s/%s", v, vertex_count))
     community_v = community_membership[[v]]
     for(neighbor in adjacency_list[[v]]) {
       community_neighbor = community_membership[[neighbor]]
@@ -21,8 +24,11 @@ build_structural_matrix <- function(community_count, vertex_count, adjacency_lis
     }
   }
   
+  print("Debut Boundaries")
+  
   # Detect Boundaries
   for(v in 1:vertex_count) {
+    if(v %% 1000 == 0) print(sprintf("%s/%s", v, vertex_count))
     community_v = community_membership[[v]]
     external_neighbors = vector()
     internal_neighbors = vector()
@@ -61,6 +67,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   else formula <- formula_for_weighted
   
   for(v in 1:nrow(structural_matrix)) {
+    if(v %% 1000 == 0) print(sprintf("%s/%s", v, nrow(structural_matrix)))
     community_i = community_membership[[v]]
     communities_j = match(2, structural_matrix[v,])
     if(!is.na(communities_j)) for(community_j in communities_j) {
@@ -122,13 +129,19 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   
   c_membership = sapply(community_membership, function(x) which(communities_names == x))
   
+  print("Etape 1")
+  
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
+  
+  print("Etape 2")
   
   # Build antagonism matrix
   res_object = build_antagonism_matrix(structural_matrix, adjacency_list, adjacency_matrix, c_membership, community_count, communities_names)
   colnames(res_object$antagonism_matrix) = communities_names
   rownames(res_object$antagonism_matrix) = communities_names
+  
+  print("Etape 3")
   
   # Calculate porosity
   res_object$porosity = porosity(res_object$boundaries, community_membership)
