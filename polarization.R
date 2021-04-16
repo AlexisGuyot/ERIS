@@ -83,7 +83,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   boundaries_count <- matrix(0, nrow = community_count, ncol = community_count)
   boundaries <- matrix(nrow = boundaries_size, ncol = 5, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community", "Pv")))
   internals <- matrix(nrow = internals_size, ncol = 4, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community")))
-
+  
   # Formula choice (with or whithout weight)
   formula <- NULL
   if(is.null(adjacency_matrix)) formula <- formula_for_unweighted
@@ -141,7 +141,8 @@ porosity = function(boundaries, community_membership) {
   res = data.frame()
   
   # Porosity calculation
-  for(community in communities) {
+  for(c in 1:length(communities)) {
+    community = communities[c]
     n = p = 0
     lines = boundaries[which(boundaries$community_vertex == community),]
     if(nrow(lines) > 0) for(i in 1:nrow(lines)) {
@@ -150,7 +151,7 @@ porosity = function(boundaries, community_membership) {
       else p = p+1
     }
     if(n != 0 || p != 0) score = as.double(n/(n+p)) else score = 0
-    if(communities_sizes[[community]] > 0 && community <= length(boundaries_sizes)) boundary_size = boundaries_sizes[[community]]/communities_sizes[[community]]
+    if(communities_sizes[[community]] > 0) boundary_size = boundaries_sizes[[community]]/communities_sizes[[community]]
     else boundary_size = 0
     res = rbind(res, data.frame("community" = community, "community_size" = communities_sizes[[community]], "boundary_size" = boundary_size, "porosity" = score))
   }
