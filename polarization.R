@@ -1,4 +1,5 @@
 library(igraph)
+library(ggplot2)
 
 #' Build the structural matrix
 #' 
@@ -164,6 +165,27 @@ porosity = function(boundaries, community_membership) {
   return (res)
 }
 
+#' Create synthetic visualizations with the method results
+#' 
+#' @param antagonism_matrix The antagonism matrix
+#' 
+#' @return 
+visualization <- function(antagonism_matrix, community_membership) {
+  communities_sizes = table(unlist(community_membership))
+  communities = names(communities_sizes)
+  antagonism_matrix = round(antagonism_matrix[communities, communities],3)
+  df_antagonism_matrix = as.data.frame(as.table(antagonism_matrix))
+  heat = ggplot(data = df_antagonism_matrix, aes(x=Var1, y=Var2, fill=Freq)) + 
+    geom_tile() +
+    geom_text(aes(Var1, Var2, label = Freq), color = "black", size = 4) +
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                         midpoint = 0, limit = c(-0.5,0.5),
+                         name="Shutdown") +
+    coord_fixed() +
+    labs(title="Shutdown matrix", x ="Community", y = "Community")
+  return (heat)
+}
+
 #' Return indicatives to conclude about polarization on a graph
 #' 
 #' @param adjacency_list Graph's adjacency list
@@ -196,6 +218,9 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   
   # Calculate porosity
   res_object$porosity = porosity(res_object$boundaries, community_membership)
+  
+  # Create visualizations
+  res_object$visualization = visualization(res_object$antagonism_matrix, community_membership)
   
   return (res_object)
 }
