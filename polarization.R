@@ -101,7 +101,7 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
       # Structural matrix reading
       for(c in 1:length(structural_matrix[v,])) 
         if(structural_matrix[[v,c]][[ci]] == 2) communities_j = c(communities_j, c)
-        else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], c); int = int + 1 }
+        else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[c]); int = int + 1 }
 
       # Eiv and Ebv calculations
       if(length(communities_j) > 0) for(community_j in communities_j) {
@@ -170,9 +170,11 @@ porosity = function(boundaries, community_membership) {
 #' @param antagonism_matrix The antagonism matrix
 #' 
 #' @return 
-visualization <- function(antagonism_matrix, community_membership) {
-  communities_sizes = table(unlist(community_membership))
+visualization <- function(antagonism_matrix, community_membership, porosity) {
+  communities_sizes = sort(table(unlist(community_membership)), decreasing = TRUE)
   communities = names(communities_sizes)
+  
+  # Shutdown matrix visualization
   antagonism_matrix = round(antagonism_matrix[communities, communities],3)
   df_antagonism_matrix = as.data.frame(as.table(antagonism_matrix))
   heat = ggplot(data = df_antagonism_matrix, aes(x=Var1, y=Var2, fill=Freq)) + 
@@ -182,11 +184,45 @@ visualization <- function(antagonism_matrix, community_membership) {
                          midpoint = 0, limit = c(-0.5,0.5),
                          name="Shutdown") +
     coord_fixed() +
+    theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1)) +
     labs(title="Shutdown matrix", x ="Community", y = "Community")
-  return (heat)
+  print(heat)
+  
+  # Porosity visualization
+  porosity = porosity[order(porosity$community_size),]
+  porosity$boundary_size = as.numeric(substr(porosity$boundary_size,1,nchar(porosity$boundary_size)-1))
+  porosity$porosity = as.numeric(substr(porosity$porosity,1,nchar(porosity$porosity)-1))
+  tmp_struct = matrix(nrow = 3 * nrow(porosity), ncol = 5, dimnames = list(NULL, c("community", "user_type", "user_count", "y_lab", "label"))); i = 1
+  while(i <= 3 * nrow(porosity)) { 
+    index = (i %/% 3) + 1
+    bounds_users = round(porosity$community_size[index] * porosity$boundary_size[index] / 100)
+    pore_users = round(bounds_users * porosity$boundary_size[index] / 100)
+    other_users = porosity$community_size[index] - bounds_users
+    bounds_users = bounds_users - pore_users
+    tmp_struct[i,] = c(as.character(porosity$community[[index]]), "other users", other_users, other_users, sprintf("%d%%", 100 - porosity$boundary_size[index]))
+    tmp_struct[i+1,] = c(as.character(porosity$community[[index]]), "bounds users", bounds_users, (other_users + bounds_users), "")
+    tmp_struct[i+2,] = c(as.character(porosity$community[[index]]), "pore users", pore_users, (other_users + bounds_users + pore_users), sprintf("%d%%", porosity$porosity[index]))
+    i = i + 3
+  }
+  tmp_struct = as.data.frame(tmp_struct)
+  tmp_struct$user_count = as.numeric(levels(tmp_struct$user_count))[tmp_struct$user_count] 
+  tmp_struct$y_lab = as.numeric(levels(tmp_struct$y_lab))[tmp_struct$y_lab]
+  tmp_struct$user_type = factor(tmp_struct$user_type, c("pore users", "bounds users", "other users"))
+  p <- ggplot(data=tmp_struct, aes(x=community, y=user_count, fill=user_type)) +
+    geom_bar(stat="identity")+
+    scale_x_discrete(limits = porosity$community) +
+    geom_text(aes(label=label), position = position_stack(vjust = 0.5), color="black", size=3.5, angle=-90)+
+    scale_fill_manual(values=c("#d5d7e0", "#9c9da1", "#527a41"))+
+    theme_minimal() +
+    coord_flip() +
+    labs(title="Porosity analysis", x ="Community", y = "Number of users", fill = "User type")
+  print(p)
+  
+  return (list(shutdown_matrix = heat, porosity = p))
 }
 
 #' Return indicatives to conclude about polarization on a graph
+#' Watch out : community_membership, adjacency_list and adjacency_matrix must have the same order
 #' 
 #' @param adjacency_list Graph's adjacency list
 #' @param community_membership A list with for each vertex of the graph its community's index
@@ -206,7 +242,7 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
 
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
-  
+
   print("Etape 2")
 
   # Build antagonism matrix
@@ -215,17 +251,19 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   rownames(res_object$antagonism_matrix) = communities_names
 
   print("Etape 3")
+  res_object$structural_matrix = structural_matrix
   
   # Calculate porosity
   res_object$porosity = porosity(res_object$boundaries, community_membership)
-  
+
   # Create visualizations
-  res_object$visualization = visualization(res_object$antagonism_matrix, community_membership)
+  res_object$visualization = visualization(res_object$antagonism_matrix, community_membership, res_object$porosity)
   
   return (res_object)
 }
 
 #' Return indicatives to conclude about polarization on a graph built with igraph
+#' Watch out : community_membership and adjacency_matrix must have the same order
 #' 
 #' @param graph The graph build with igraph
 #' @param community_membership A list with for each vertex of the graph its community's index
