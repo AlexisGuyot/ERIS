@@ -77,8 +77,8 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
   int = bound = 1
   for(elt in structural_matrix) for(value in unlist(elt)) 
     if(value == 0) internals_size = internals_size + 1
-    else if(value == 2) boundaries_size = boundaries_size + 1
-
+  else if(value == 2) boundaries_size = boundaries_size + 1
+  
   # Structures initialization
   antagonism_matrix <- matrix(0, nrow = community_count, ncol = community_count)
   boundaries_count <- matrix(0, nrow = community_count, ncol = community_count)
@@ -101,19 +101,19 @@ build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency
       # Structural matrix reading
       for(c in 1:length(structural_matrix[v,])) 
         if(structural_matrix[[v,c]][[ci]] == 2) communities_j = c(communities_j, c)
-        else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[c]); int = int + 1 }
-
+      else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[c]); int = int + 1 }
+      
       # Eiv and Ebv calculations
       if(length(communities_j) > 0) for(community_j in communities_j) {
         Ebv = 0
         Eiv = 0
         for(neighbor in adjacency_list[[v]])
           if(community_j %in% community_membership[[neighbor]]) Ebv = formula(Ebv, adjacency_matrix, v, neighbor)
-          else {
-            index = match(community_i, community_membership[[neighbor]])
-            if(!is.na(index) && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
-          }
-
+        else {
+          index = match(community_i, community_membership[[neighbor]])
+          if(!is.na(index) && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
+        }
+        
         # Antagonism calculation
         antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
         boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
@@ -239,23 +239,23 @@ polarization <- function(adjacency_list, community_membership, adjacency_matrix 
   c_membership = lapply(community_membership, apply_temporary_names)
   
   print("Etape 1")
-
+  
   # Build structural list
   structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
-
+  
   print("Etape 2")
-
+  
   # Build antagonism matrix
   res_object = build_antagonism_matrix(structural_matrix, adjacency_list, adjacency_matrix, c_membership, community_count, communities_names)
   colnames(res_object$antagonism_matrix) = communities_names
   rownames(res_object$antagonism_matrix) = communities_names
-
+  
   print("Etape 3")
   res_object$structural_matrix = structural_matrix
   
   # Calculate porosity
   res_object$porosity = porosity(res_object$boundaries, community_membership)
-
+  
   # Create visualizations
   res_object$visualization = visualization(res_object$antagonism_matrix, community_membership, res_object$porosity)
   
