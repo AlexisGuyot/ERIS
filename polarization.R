@@ -1,283 +1,106 @@
-library(igraph)
-library(ggplot2)
+# This part of the code requires the 'Matrix' library.
+if (!require("Matrix")) install.packages("Matrix"); library(Matrix)
+require("igraph")
 
-#' Build the structural matrix
+# Path to the R file containing the functions to generate the vizualisation charts.
+source("polarization_vizualisation.R")
+
+#' Compute the polarization results from an adjacency matrix and a community matrix.
 #' 
-#' @param community_count Number of communities in the graph
-#' @param vertex_count Number of vertices in the graph
-#' @param adjacency_list Graph's adjacency list (with igraph's adj_list format)
-#' @param community_membership A list with for each vertex of the graph its community's index (as.list)
+#' @param Ma An adjacency matrix.
+#' @param Mc A community matrix (each row = vertex, each column = community, cell = 1 if vertex in community or 0 otherwise).
+#' @param vertices_names A string vector containing the name of each vertex (in the same order as Ma and Mc's rows).
+#' @param community_names A string vector containing the name of each community (in the same order as Mc's columns).
+#' @param debug A logical scalar, TRUE returns all the transitional matrices, FALSE only the final ones with the results. 
 #' 
-#' @return The structural matrix
-build_structural_matrix <- function(community_count, vertex_count, adjacency_list, community_membership) {
-  structural_matrix = matrix(list(0), nrow = vertex_count, ncol = community_count)
+#' @return if debug == FALSE: the antagonism matrix, the porosity matrix, the porosity by boundary size chart ; if debug == TRUE, all the matrices computed without fancy names.
+compute_antagonism <- function(Ma, Mc, vertices_names = NULL, community_names = NULL, debug = FALSE) {
+  nb_comm = ncol(Mc)    # Community count
   
-  print("Début Internals")
+  # Assign auto-generated or not names to vertices and communities.
+  if(!is.null(community_names)) colnames(Mc) = community_names 
+  else colnames(Mc) = sapply(seq(nb_comm), function(x) paste('C',x, sep=''))
+  if(!is.null(vertices_names)) { colnames(Ma) = vertices_names; rownames(Ma) = vertices_names; rownames(Mc) = vertices_names } 
+  else { s = sapply(seq(nrow(Mc)), function(x) paste('',x, sep='')); colnames(Ma) = s; rownames(Ma) = s; rownames(Mc) = s }
   
-  # Detect Internals
-  for(v in 1:vertex_count) {
-    if(v %% 1000 == 0) print(sprintf("%s/%s", v, vertex_count))
-    communities_v = community_membership[[v]]
-    for(cv in 1:length(communities_v)) {
-      community_v = communities_v[[cv]]
-      if(cv > 1) for(c in 1:community_count) structural_matrix[[v,c]][[cv]] = 0
-      structural_matrix[[v, community_v]][[cv]] = 3
-      for(neighbor in adjacency_list[[v]]) {
-        communities_neighbor = community_membership[[neighbor]]
-        for(cn in 1:length(communities_neighbor)) {
-          community_neighbor = communities_neighbor[[cn]]
-          if(community_v != community_neighbor) structural_matrix[[v, community_neighbor]][[cv]] = 1
-        }
-      }
-    }
+  # Compute the results.
+  NMc = 1*!Mc    # The inverse of the binary community matrix.
+  McT = t(Mc)    # The transpose of the binary community matrix.
+  
+  Md = Ma %*% Mc    # Matrix containing the sums of degrees toward each community for each vertex.
+  
+  I = 1 * (Md == 0)    # A mask of the previous matrix.
+  NI = (1 * !I)        # The inverse of this mask.
+  
+  Ii = vector(mode = "list", length = nb_comm); Mdsi = vector(mode = "list", length = nb_comm); mMdsi = vector(mode = "list", length = nb_comm); Mvani = vector(mode = "list", length = nb_comm); clean_Mvani = vector(mode = "list", length = nb_comm); Mbsi = vector(mode = "list", length = nb_comm); Mani = vector(mode = "list", length = nb_comm); Mpi = vector(mode = "list", length = nb_comm);
+  for(i in 1:nb_comm) {
+    # A mask revealing the positions of the internal vertices for the community.
+    Ii[[i]] = (I * NMc) * Mc[,i]
+    # Matrix containing the sums of degrees toward each internal vertex of the community.
+    Mdsi[[i]] = (Ma %*% Ii[[i]]) * Mc[,i] * NI
+    # Mask of the previous matrix.
+    mMdsi[[i]] = 1 * (Mdsi[[i]] != 0)
+    # Matrix containing the antagonism scores toward each community for each vertex of the community.
+    Mvani[[i]] = (Mdsi[[i]]/(Mdsi[[i]] + Md)) - 0.5; Mvani[[i]] = Mvani[[i]] * (Mdsi[[i]] > 0); Mvani[[i]][is.na(Mvani[[i]])] = 0
+    # Same as the last one but only containing the rows corresponding to a boundary vertex of the community.
+    clean_Mvani[[i]] = list(Mvani[[i]][apply(mMdsi[[i]], 1, function(x) !all(x==0)),])
+    # Vector containing the sizes of all the boundaries of the current community.
+    Mbsi[[i]] = colSums(mMdsi[[i]])
+    # Vector containing the antagonism scores toward each community for the current community.
+    Mani[[i]] = (McT[i,] %*% Mvani[[i]]) / (McT[i,] %*% mMdsi[[i]]); Mani[[i]][is.na(Mani[[i]])] = 0
+    # Vector containing the porosity scores toward each community for the current community.
+    Mpi[[i]] = ((McT[i,] %*% (1*(Mvani[[i]] < 0))) / replace(Mbsi[[i]], Mbsi[[i]] == 0, 1)) * 100
   }
   
-  print("Début Boundaries")
+  # Gather the vectors into matrices.
+  Man = do.call(rbind, Mani); rownames(Man) = community_names
+  Mp = do.call(rbind, Mpi); rownames(Mp) = community_names
+  Mbs = do.call(rbind, Mbsi); rownames(Mbs) = community_names
   
-  # Detect Boundaries
-  for(v in 1:vertex_count) {
-    if(v %% 1000 == 0) print(sprintf("%s/%s", v, vertex_count))
-    communities_v = community_membership[[v]]
-    for(cv in 1:length(communities_v)) {
-      community_v = communities_v[[cv]]
-      external_neighbors = vector()
-      internal_neighbors = vector()
-      for(neighbor in adjacency_list[[v]]) {
-        communities_neighbor = community_membership[[neighbor]]
-        for(cn in 1:length(communities_neighbor)) {
-          community_neighbor = communities_neighbor[[cn]]
-          if(community_v != community_neighbor) external_neighbors = c(external_neighbors, community_neighbor)
-          else 
-            for(co in 1:length(structural_matrix[neighbor,])) if(structural_matrix[[neighbor,co]][[cn]] == 0) internal_neighbors = c(internal_neighbors, co)
-        }
-      }
-      for(community in intersect(external_neighbors, internal_neighbors)) structural_matrix[[v, community]][[cv]] = 2
-    }
-  }
-  
-  return (structural_matrix)
-}
-
-#' Build the antagonism matrix
-#' 
-#' @param structural_matrix The structural matrix built by the 'build_structural_matrix' function
-#' @param adjacency_list Graph's adjacency list
-#' @param adjacency_matrix Graph's adjacency matrix
-#' @param community_membership A list with for each vertex of the graph its community's index
-#' @param community_count Number of communities in the graph
-#' @param communities_names Communities' names
-#' 
-#' @return A structure containing the antagonism matrix ($antagonism_matrix), the boundaries members ($boundaries) and the internal areas' members ($internals)
-build_antagonism_matrix <- function(structural_matrix, adjacency_list, adjacency_matrix, community_membership, community_count, communities_names) {
-  formula_for_weighted <- function(x, adjacency_matrix, source, target) { return (x + adjacency_matrix[source, target]) }
-  formula_for_unweighted <- function(x, adjacency_matrix, source, target) { return (x+1) }  
-  
-  # Structural Matrix content analysis
-  internals_size = boundaries_size = 0
-  int = bound = 1
-  for(elt in structural_matrix) for(value in unlist(elt)) 
-    if(value == 0) internals_size = internals_size + 1
-    else if(value == 2) boundaries_size = boundaries_size + 1
-
-  # Structures initialization
-  antagonism_matrix <- matrix(0, nrow = community_count, ncol = community_count)
-  boundaries_count <- matrix(0, nrow = community_count, ncol = community_count)
-  boundaries <- matrix(nrow = boundaries_size, ncol = 5, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community", "Pv")))
-  internals <- matrix(nrow = internals_size, ncol = 4, dimnames = list(NULL, c("vertex", "degree", "community_vertex", "other_community")))
-  
-  # Formula choice (with or whithout weight)
-  formula <- NULL
-  if(is.null(adjacency_matrix)) formula <- formula_for_unweighted
-  else formula <- formula_for_weighted
-  
-  # Antagonism matrix build
-  for(v in 1:nrow(structural_matrix)) {
-    if(v %% 1000 == 0) print(sprintf("%s/%s", v, nrow(structural_matrix)))
-    communities_i = community_membership[[v]]
-    for(ci in 1:length(communities_i)) {
-      community_i = communities_i[[ci]]
-      communities_j = numeric()
-      
-      # Structural matrix reading
-      for(c in 1:length(structural_matrix[v,])) 
-        if(structural_matrix[[v,c]][[ci]] == 2) communities_j = c(communities_j, c)
-        else if(structural_matrix[[v,c]][[ci]] == 0) { internals[int,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[c]); int = int + 1 }
-
-      # Eiv and Ebv calculations
-      if(length(communities_j) > 0) for(community_j in communities_j) {
-        Ebv = 0
-        Eiv = 0
-        for(neighbor in adjacency_list[[v]])
-          if(community_j %in% community_membership[[neighbor]]) Ebv = formula(Ebv, adjacency_matrix, v, neighbor)
-          else {
-            index = match(community_i, community_membership[[neighbor]])
-            if(!is.na(index) && structural_matrix[neighbor,community_j][[index]] == 0) Eiv = formula(Eiv, adjacency_matrix, v, neighbor)
-          }
-
-        # Antagonism calculation
-        antagonism_matrix[[community_i, community_j]] = antagonism_matrix[[community_i, community_j]] + (Eiv/(Eiv+Ebv) - 0.5)
-        boundaries_count[[community_i, community_j]] = boundaries_count[[community_i, community_j]] + 1
-        boundaries[bound,] = c(v, length(adjacency_list[[v]]), communities_names[community_i], communities_names[community_j], (Eiv/(Eiv+Ebv) - 0.5)); bound = bound + 1
-      }
-    }
-  }
-  
-  return (list(boundaries = as.data.frame(boundaries), internals = as.data.frame(internals), antagonism_matrix = (antagonism_matrix / ifelse(boundaries_count==0, 1, boundaries_count))))
-}
-
-#' Calculate the porosity of the boundaries
-#' 
-#' @param boundaries Boundaries extracted by the function 'build_antagonism_matrix'
-#' @param community_membership A list with for each vertex of the graph its community's index
-#' 
-#' @return A data frame with for each community its porosity value
-porosity = function(boundaries, community_membership) {
-  percent = function(number_double) { return (paste(round(number_double * 100), "%", sep=''))}
-  distinct = function(dataframe, columns) { return (dataframe[!duplicated(dataframe[,columns]),]) }
-  
-  # Sizes analysis
-  communities_sizes = table(unlist(community_membership))
-  boundaries_sizes = table(distinct(boundaries, c('vertex', "community_vertex"))$community_vertex)
-  communities = names(communities_sizes)
-  res = data.frame()
-  
-  # Porosity calculation
-  for(c in 1:length(communities)) {
-    community = communities[c]
-    n = p = 0
-    lines = boundaries[which(boundaries$community_vertex == community),]
-    if(nrow(lines) > 0) for(i in 1:nrow(lines)) {
-      line = lines[i,]
-      if(as.numeric(as.character(line$Pv)) <= 0) n = n+1
-      else p = p+1
-    }
-    if(n != 0 || p != 0) score = as.double(n/(n+p)) else score = 0
-    if(communities_sizes[[community]] > 0) boundary_size = boundaries_sizes[[community]]/communities_sizes[[community]]
-    else boundary_size = 0
-    res = rbind(res, data.frame("community" = community, "community_size" = communities_sizes[[community]], "boundary_size" = boundary_size, "porosity" = score))
-  }
-  
-  # Result shaping
-  res = res[order(res$porosity),]
-  res$boundary_size = sapply(res$boundary_size, percent)
-  res$porosity = sapply(res$porosity, percent)
+  # Build the result object.
+  res = list()                                                                                               
+  if(!debug) res = list(antagonism_vertices = clean_Mvani, boundary_sizes_matrix = Mbs, porosity_matrix = Mp, antagonism_matrix = Man, vizualisation = compute_vizualisations(Mc, Man, Mp, Mbs))
+  else res = list(Ma = Ma, Mc = Mc, NMc = NMc, McT = McT, Md = Md, I = I, NI = NI, Ii = Ii, Mdsi = Mdsi, Mvani = Mvani, clean_Mvani = clean_Mvani, Mani = Mani, Mpi = Mpi, Mp = Mp, Mbsi = Mbsi, Mbs = Mbs, Man = Man, vizu = compute_vizualisations(Mc, Man, Mp, Mbs))
   
   return (res)
 }
 
-#' Create synthetic visualizations with the method results
+#' Create the charts from polarization results.
 #' 
-#' @param antagonism_matrix The antagonism matrix
+#' @param community_matrix The community matrix (each row = vertex, each column = community, cell = 1 if vertex in community or 0 otherwise).
+#' @param antagonism_matrix The antagonism matrix.
+#' @param porosity_matrix The porosity matrix.
+#' @param boundary_sizes_matrix The boundary sizes matrix.
 #' 
-#' @return 
-visualization <- function(antagonism_matrix, community_membership, porosity) {
-  communities_sizes = sort(table(unlist(community_membership)), decreasing = TRUE)
-  communities = names(communities_sizes)
-  
-  # Shutdown matrix visualization
-  antagonism_matrix = round(antagonism_matrix[communities, communities],3)
-  df_antagonism_matrix = as.data.frame(as.table(antagonism_matrix))
-  heat = ggplot(data = df_antagonism_matrix, aes(x=Var1, y=Var2, fill=Freq)) + 
-    geom_tile() +
-    geom_text(aes(Var1, Var2, label = Freq), color = "black", size = 4) +
-    scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                         midpoint = 0, limit = c(-0.5,0.5),
-                         name="Shutdown") +
-    coord_fixed() +
-    theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1)) +
-    labs(title="Shutdown matrix", x ="Community", y = "Community")
-  print(heat)
-  
-  # Porosity visualization
-  porosity = porosity[order(porosity$community_size),]
-  porosity$boundary_size = as.numeric(substr(porosity$boundary_size,1,nchar(porosity$boundary_size)-1))
-  porosity$porosity = as.numeric(substr(porosity$porosity,1,nchar(porosity$porosity)-1))
-  tmp_struct = matrix(nrow = 3 * nrow(porosity), ncol = 5, dimnames = list(NULL, c("community", "user_type", "user_count", "y_lab", "label"))); i = 1
-  while(i <= 3 * nrow(porosity)) { 
-    index = (i %/% 3) + 1
-    bounds_users = round(porosity$community_size[index] * porosity$boundary_size[index] / 100)
-    pore_users = round(bounds_users * porosity$boundary_size[index] / 100)
-    other_users = porosity$community_size[index] - bounds_users
-    bounds_users = bounds_users - pore_users
-    tmp_struct[i,] = c(as.character(porosity$community[[index]]), "other users", other_users, other_users, sprintf("%d%%", 100 - porosity$boundary_size[index]))
-    tmp_struct[i+1,] = c(as.character(porosity$community[[index]]), "bounds users", bounds_users, (other_users + bounds_users), "")
-    tmp_struct[i+2,] = c(as.character(porosity$community[[index]]), "pore users", pore_users, (other_users + bounds_users + pore_users), sprintf("%d%%", porosity$porosity[index]))
-    i = i + 3
-  }
-  tmp_struct = as.data.frame(tmp_struct)
-  tmp_struct$user_count = as.numeric(levels(tmp_struct$user_count))[tmp_struct$user_count] 
-  tmp_struct$y_lab = as.numeric(levels(tmp_struct$y_lab))[tmp_struct$y_lab]
-  tmp_struct$user_type = factor(tmp_struct$user_type, c("pore users", "bounds users", "other users"))
-  p <- ggplot(data=tmp_struct, aes(x=community, y=user_count, fill=user_type)) +
-    geom_bar(stat="identity")+
-    scale_x_discrete(limits = porosity$community) +
-    geom_text(aes(label=label), position = position_stack(vjust = 0.5), color="black", size=3.5, angle=-90)+
-    scale_fill_manual(values=c("#d5d7e0", "#9c9da1", "#527a41"))+
-    theme_minimal() +
-    coord_flip() +
-    labs(title="Porosity analysis", x ="Community", y = "Number of users", fill = "User type")
-  print(p)
-  
-  return (list(shutdown_matrix = heat, porosity = p))
+#' @return A list containing all the charts generated with ggplot2.
+compute_vizualisations <- function(community_matrix, antagonism_matrix, porosity_matrix, boundary_sizes_matrix) {
+  return (list(
+    antagonism_matrix = matrix_vizualisation(antagonism_matrix, community_matrix, low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-0.5,0.5), name="Antagonism"),
+    porosity_matrix = matrix_vizualisation(porosity_matrix, community_matrix, low = "white", high = "green4", mid = "darkolivegreen3", midpoint = 50, limit = c(0,100), name="Porosity (in %)"),
+    porosity_by_size = porosity_vizualisation2D(porosity_matrix, boundary_sizes_matrix)
+  ))
 }
 
-#' Return indicatives to conclude about polarization on a graph
-#' Watch out : community_membership, adjacency_list and adjacency_matrix must have the same order
+#' Compute the polarization results from a graph object created with the igraph library.
+#' The weights must be contained in an edge attribute called 'weight'.
 #' 
-#' @param adjacency_list Graph's adjacency list
-#' @param community_membership A list with for each vertex of the graph its community's index
-#' @param adjacency_matrix Graph's adjacency matrix
+#' @param graph A graph.
+#' @param community_attr The vertex attribute containing its community(ies).
+#' @param vnames_attr The vertex attribute containing its name/identifier.
+#' @param debug A logical scalar, TRUE returns all the transitional matrices, FALSE only the final ones with the results.
 #' 
-#' @return A structure containing the antagonism matrix ($antagonism_matrix), the boundaries members ($boundaries), the internal areas' members ($internals) and the porosity values ($porosity)
-polarization <- function(adjacency_list, community_membership, adjacency_matrix = NULL) {
-  vertex_count = length(adjacency_list)
-  size_communities = table(unlist(community_membership))
-  community_count = length(size_communities)
-  communities_names = names(size_communities)
+#' @return if debug == FALSE: the antagonism matrix, the porosity matrix, the porosity by boundary size chart ; if debug == TRUE, all the matrices computed without fancy names.
+compute_antagonism_graph <- function(graph, community_attr = "community", vnames_attr = "name", debug = FALSE, fct = compute_antagonism) {
+  # Build the adjacency matrix.
+  Ma = as_adjacency_matrix(graph, attr = "weight")
   
-  apply_temporary_names <- function(x) {  tmp = integer(); for(xx in 1:length(x)) tmp[[xx]] = as.integer(which(communities_names == x[[xx]])); return (tmp) }
-  c_membership = lapply(community_membership, apply_temporary_names)
+  # Build the community matrix.
+  community_attributes = get.vertex.attribute(graph, community_attr)
+  community_names = unique(community_attributes)
+  vertices_names = get.vertex.attribute(graph, vnames_attr)
+  Mc = t(sapply(community_attributes, function(x) as.numeric(x == community_names)))
+  colnames(Mc) = community_names; rownames(Mc) = vertices_names
   
-  print("Etape 1")
-
-  # Build structural list
-  structural_matrix <- build_structural_matrix(community_count, vertex_count, adjacency_list, c_membership)
-
-  print("Etape 2")
-
-  # Build antagonism matrix
-  res_object = build_antagonism_matrix(structural_matrix, adjacency_list, adjacency_matrix, c_membership, community_count, communities_names)
-  colnames(res_object$antagonism_matrix) = communities_names
-  rownames(res_object$antagonism_matrix) = communities_names
-
-  print("Etape 3")
-  res_object$structural_matrix = structural_matrix
-  
-  # Calculate porosity
-  res_object$porosity = porosity(res_object$boundaries, community_membership)
-
-  # Create visualizations
-  res_object$visualization = visualization(res_object$antagonism_matrix, community_membership, res_object$porosity)
-  
-  return (res_object)
-}
-
-#' Return indicatives to conclude about polarization on a graph built with igraph
-#' Watch out : community_membership and adjacency_matrix must have the same order
-#' 
-#' @param graph The graph build with igraph
-#' @param community_membership A list with for each vertex of the graph its community's index
-#' @param adjacency_matrix Graph's adjacency matrix
-#' @param weight_attr_name Name of the edges' attribute containing the weight of the link (default to 'weight')
-#' 
-#' @return A structure containing the antagonism matrix ($antagonism_matrix), the boundaries members ($boundaries), the internal areas' members ($internals) and the porosity values ($porosity)
-graph_polarization <- function(graph, community_membership = NULL, adjacency_matrix = NULL, weight_attr_name = "weight") {
-  adjacency_list = as_adj_list(graph, mode = "out")
-  if(is.weighted(graph)) adjacency_matrix = as_adjacency_matrix(graph, attr = weight_attr_name)
-  if(is.null(community_membership)) community_membership = membership(graph)
-  
-  # Build antagonism matrix and boundaries
-  res_object = polarization(adjacency_list, community_membership, adjacency_matrix)
-  
-  return (res_object)
+  # Compute and return the polarization results.
+  return (fct(Ma, Mc, vertices_names = vertices_names, community_names = community_names, debug = debug))
 }
