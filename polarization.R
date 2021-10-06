@@ -5,7 +5,7 @@ require("igraph")
 # Path to the R file containing the functions to generate the vizualisation charts.
 source("polarization_vizualisation.R")
 
-#' Compute the polarization results from an adjacency matrix and a community matrix.
+#' Compute the polarization metrics from an adjacency matrix and a community matrix.
 #' 
 #' @param Ma An adjacency matrix.
 #' @param Mc A community matrix (each row = vertex, each column = community, cell = 1 if vertex in community or 0 otherwise).
@@ -14,7 +14,7 @@ source("polarization_vizualisation.R")
 #' @param debug A logical scalar, TRUE returns all the transitional matrices, FALSE only the final ones with the results. 
 #' 
 #' @return if debug == FALSE: the antagonism matrix, the porosity matrix, the porosity by boundary size chart ; if debug == TRUE, all the matrices computed without fancy names.
-compute_antagonism <- function(Ma, Mc, vertices_names = NULL, community_names = NULL, debug = FALSE) {
+compute_polarization_metrics <- function(Ma, Mc, vertices_names = NULL, community_names = NULL, debug = FALSE) {
   nb_comm = ncol(Mc)    # Community count
   
   # Assign auto-generated or not names to vertices and communities.
@@ -59,8 +59,8 @@ compute_antagonism <- function(Ma, Mc, vertices_names = NULL, community_names = 
   
   # Build the result object.
   res = list()                                                                                               
-  if(!debug) res = list(antagonism_vertices = clean_Mvani, boundary_sizes_matrix = Mbs, porosity_matrix = Mp, antagonism_matrix = Man, vizualisation = compute_vizualisations(Mc, Man, Mp, Mbs))
-  else res = list(Ma = Ma, Mc = Mc, NMc = NMc, McT = McT, Md = Md, I = I, NI = NI, Ii = Ii, Mdsi = Mdsi, Mvani = Mvani, clean_Mvani = clean_Mvani, Mani = Mani, Mpi = Mpi, Mp = Mp, Mbsi = Mbsi, Mbs = Mbs, Man = Man, vizu = compute_vizualisations(Mc, Man, Mp, Mbs))
+  if(!debug) res = list(antagonism_vertices = clean_Mvani, boundary_sizes_matrix = Mbs, porosity_matrix = Mp, antagonism_matrix = Man, vizualisation = compute_polarization_vizualisations(Mc, Man, Mp, Mbs))
+  else res = list(Ma = Ma, Mc = Mc, NMc = NMc, McT = McT, Md = Md, I = I, NI = NI, Ii = Ii, Mdsi = Mdsi, Mvani = Mvani, clean_Mvani = clean_Mvani, Mani = Mani, Mpi = Mpi, Mp = Mp, Mbsi = Mbsi, Mbs = Mbs, Man = Man, vizu = compute_polarization_vizualisations(Mc, Man, Mp, Mbs))
   
   return (res)
 }
@@ -73,7 +73,7 @@ compute_antagonism <- function(Ma, Mc, vertices_names = NULL, community_names = 
 #' @param boundary_sizes_matrix The boundary sizes matrix.
 #' 
 #' @return A list containing all the charts generated with ggplot2.
-compute_vizualisations <- function(community_matrix, antagonism_matrix, porosity_matrix, boundary_sizes_matrix) {
+compute_polarization_vizualisations <- function(community_matrix, antagonism_matrix, porosity_matrix, boundary_sizes_matrix) {
   return (list(
     antagonism_matrix = matrix_vizualisation(antagonism_matrix, community_matrix, low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-0.5,0.5), name="Antagonism"),
     porosity_matrix = matrix_vizualisation(porosity_matrix, community_matrix, low = "white", high = "green4", mid = "darkolivegreen3", midpoint = 50, limit = c(0,100), name="Porosity (in %)"),
@@ -81,7 +81,7 @@ compute_vizualisations <- function(community_matrix, antagonism_matrix, porosity
   ))
 }
 
-#' Compute the polarization results from a graph object created with the igraph library.
+#' Compute the polarization metrics from a graph object created with the igraph library.
 #' The weights must be contained in an edge attribute called 'weight'.
 #' 
 #' @param graph A graph.
@@ -90,7 +90,7 @@ compute_vizualisations <- function(community_matrix, antagonism_matrix, porosity
 #' @param debug A logical scalar, TRUE returns all the transitional matrices, FALSE only the final ones with the results.
 #' 
 #' @return if debug == FALSE: the antagonism matrix, the porosity matrix, the porosity by boundary size chart ; if debug == TRUE, all the matrices computed without fancy names.
-compute_antagonism_graph <- function(graph, community_attr = "community", vnames_attr = "name", debug = FALSE, fct = compute_antagonism) {
+compute_polarization_metrics_graph <- function(graph, community_attr = "community", vnames_attr = "name", debug = FALSE) {
   # Build the adjacency matrix.
   Ma = as_adjacency_matrix(graph, attr = "weight")
   
@@ -102,5 +102,5 @@ compute_antagonism_graph <- function(graph, community_attr = "community", vnames
   colnames(Mc) = community_names; rownames(Mc) = vertices_names
   
   # Compute and return the polarization results.
-  return (fct(Ma, Mc, vertices_names = vertices_names, community_names = community_names, debug = debug))
+  return (compute_polarization_metrics(Ma, Mc, vertices_names = vertices_names, community_names = community_names, debug = debug))
 }
