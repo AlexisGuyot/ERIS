@@ -14,6 +14,7 @@ if(file.exists("polarization_vizualisation.R")) source("polarization_vizualisati
 #' @param community_names A string vector containing the name of each community (in the same order as Mc's columns).
 #' @param debug A logical scalar, TRUE returns all the transitional matrices, FALSE only the final ones with the results. 
 #' 
+
 #' @return if debug == FALSE: the antagonism matrix, the porosity matrix, matrices with the sizes of the boundaries (absolute and relative) the porosity by boundary size chart ; if debug == TRUE, all the matrices computed without fancy names.
 compute_polarization_metrics <- function(Ma, Mc, vertices_names = NULL, community_names = NULL, debug = FALSE) {
   nb_comm = ncol(Mc)    # Community count
@@ -68,6 +69,7 @@ compute_polarization_metrics <- function(Ma, Mc, vertices_names = NULL, communit
   
   # Build the result object.
   res = list()                                                                                               
+
   if(!debug) res = list(antagonism_vertices = clean_Mvani, boundary_sizes_matrix = Mbs, boundary_rsizes_matrix = Mbrs, porosity_matrix = Mp, antagonism_matrix = Man, vizualisation = Vizu)
   else res = list(Ma = Ma, Mc = Mc, NMc = NMc, McT = McT, Md = Md, I = I, NI = NI, Ii = Ii, Mdsi = Mdsi, Mvani = Mvani, clean_Mvani = clean_Mvani, Mani = Mani, Mpi = Mpi, Mp = Mp, Mbsi = Mbsi, Mbrsi = Mbrsi, Mbs = Mbs, Mbrs = Mbrs, Man = Man, vizu = Vizu)
   
@@ -87,6 +89,7 @@ compute_polarization_metrics <- function(Ma, Mc, vertices_names = NULL, communit
 compute_polarization_vizualisations <- function(community_matrix, antagonism_matrix, porosity_matrix, boundary_sizes_matrix, boundary_rsizes_matrix, community_names = NULL) {
   boundary_sizes = `dim<-`(sprintf('%s\n(%s%%)', boundary_sizes_matrix, round(boundary_rsizes_matrix, 1)), dim(boundary_sizes_matrix))
   colnames(boundary_sizes) = colnames(boundary_rsizes_matrix); rownames(boundary_sizes) = rownames(boundary_rsizes_matrix)
+
   return (list(
     antagonism_matrix = matrix_vizualisation(antagonism_matrix, community_matrix, low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-0.5,0.5), name="Antagonism", decimal = 3, community_names),
     porosity_matrix = matrix_vizualisation(porosity_matrix, community_matrix, low = "white", high = "green4", mid = "darkolivegreen3", midpoint = 50, limit = c(0,100), name = "Porosity (in %)", decimal = 1, community_names),
