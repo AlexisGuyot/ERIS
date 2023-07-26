@@ -18,28 +18,30 @@ VizuLoaded = TRUE
 #' @param values_to_display An alternative version of matrix_to_display with formatted fancy values to display.
 #' 
 #' @return The corresponding heat map.
-matrix_vizualisation <- function(matrix_to_display, Mc, low, high, mid, midpoint, limit, name, decimal, 
-                                 community_names = NULL, values_to_display = NULL) {
+matrix_vizualisation <- function(matrix_to_display, Mc, low, high, mid, midpoint, limit, name, decimal, textSize = 4,
+                                 community_names = NULL, values_to_display = NULL) {    
+  if(is.null(values_to_display)) the_matrix = round(matrix_to_display,decimal)
+  else the_matrix = values_to_display
+    
   if(is.null(community_names)) {
-      colnames(matrix_to_display) = colnames(Mc); rownames(matrix_to_display) = colnames(Mc)
+      colnames(the_matrix) = colnames(Mc); rownames(the_matrix) = colnames(Mc)
       # Reorder the matrix from the biggest community to the smallest.
       communities = colnames(Mc[,order(colSums(Mc))])
   }
   else {
-      colnames(matrix_to_display) = community_names; rownames(matrix_to_display) = community_names
+      colnames(the_matrix) = community_names; rownames(the_matrix) = community_names
       communities = community_names
   }
-  matrix_to_display = round(matrix_to_display[communities, communities],decimal)
+  #matrix_to_display = round(matrix_to_display[communities, communities],decimal)
     
   
   df_matrix_to_display = as.data.frame(as.table(as.matrix(matrix_to_display)))
-  if(is.null(values_to_display)) df_values_to_display = df_matrix_to_display
-  else df_values_to_display = as.data.frame(as.table(as.matrix(values_to_display[communities, communities])))
+  df_values_to_display = as.data.frame(as.table(as.matrix(the_matrix)))
     
   # Create the chart.
   heat = ggplot(data = df_values_to_display, aes(x=Var2, y=Var1, fill=df_matrix_to_display$Freq)) + 
     geom_tile() +
-    geom_text(aes(Var2, Var1, label = Freq), color = "black", size = 4) +
+    geom_text(aes(Var2, Var1, label = Freq), color = "black", size = textSize) +
     scale_fill_gradient2(low = low, high = high, mid = mid, 
                          midpoint = midpoint, limit = limit,
                          name=name) +
