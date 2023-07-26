@@ -86,14 +86,14 @@ compute_polarization_metrics <- function(Ma, Mc, vertices_names = NULL, communit
 #' @param community_names A list with exactly one name by community (in the same order as in the matrices).
 #' 
 #' @return A list containing all the charts generated with ggplot2.
-compute_polarization_vizualisations <- function(community_matrix, antagonism_matrix, porosity_matrix, boundary_sizes_matrix, boundary_rsizes_matrix, community_names = NULL) {
+compute_polarization_vizualisations <- function(community_matrix, antagonism_matrix, porosity_matrix, boundary_sizes_matrix, boundary_rsizes_matrix, community_names = NULL, textSize = 4) {
   boundary_sizes = `dim<-`(sprintf('%s\n(%s%%)', boundary_sizes_matrix, round(boundary_rsizes_matrix, 1)), dim(boundary_sizes_matrix))
   colnames(boundary_sizes) = colnames(boundary_rsizes_matrix); rownames(boundary_sizes) = rownames(boundary_rsizes_matrix)
-
+        
   return (list(
-    antagonism_matrix = matrix_vizualisation(antagonism_matrix, community_matrix, low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-0.5,0.5), name="Antagonism", decimal = 3, community_names),
-    porosity_matrix = matrix_vizualisation(porosity_matrix, community_matrix, low = "white", high = "green4", mid = "darkolivegreen3", midpoint = 50, limit = c(0,100), name = "Porosity (in %)", decimal = 1, community_names),
-    boundary_size_matrix = matrix_vizualisation(boundary_rsizes_matrix, community_matrix, low = "white", high = "darkgray", mid = "gray", midpoint = 50, limit = c(0,100), name = "Boundary size", decimal = 2, community_names, boundary_sizes),
+    antagonism_matrix = matrix_vizualisation(antagonism_matrix, community_matrix, low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-0.5,0.5), name="Antagonism", decimal = 3, textSize, community_names),
+    porosity_matrix = matrix_vizualisation(porosity_matrix, community_matrix, low = "white", high = "green4", mid = "darkolivegreen3", midpoint = 50, limit = c(0,100), name = "Porosity (in %)", decimal = 1, textSize, community_names),
+    boundary_size_matrix = matrix_vizualisation(boundary_rsizes_matrix, community_matrix, low = "white", high = "darkgray", mid = "gray", midpoint = 50, limit = c(0,100), name = "Boundary size", decimal = 2, textSize, community_names, boundary_sizes),
     porosity_by_size = porosity_vizualisation2D(porosity_matrix, boundary_sizes_matrix)
   ))
 }
