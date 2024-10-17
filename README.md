@@ -1,6 +1,9 @@
 # ERIS: Polarization, Antagonism and Community Boundaries
 
-Description is coming.
+Implementation related to the following article:
+Guyot, A., Gillet, A., Leclercq, É., & Cullot, N. (2022, May). ERIS: an approach based on community boundaries to assess polarization in online social networks. In International Conference on Research Challenges in Information Science (pp. 88-104). Cham: Springer International Publishing. Link: https://hal.science/hal-03889719/file/RCIS_2022_Polarization_FINAL.pdf.
+
+Detection and characterization of polarization are of major interest in Social Network Analysis, especially to identify conflictual topics that animate the interactions between users. As gatekeepers of their community, users in the boundaries significantly contribute to its polarization. We propose ERIS, a formal graph approach relying on community boundaries and users’ interactions to compute two metrics: the community antagonism and the porosity of boundaries. These values assess the degree of opposition between communities and their aversion to external exposure, allowing an understanding of the overall polarization through the behaviors of the different communities. We also propose an implementation based on matrix computations, freely available online. Our experiments show a significant improvement in terms of time efficiency in comparison to existing solutions. In the article, we apply our proposal on real data harvested from Twitter with a case study about the vaccines and the COVID-19.
 
 You can find extra resources related to execution times on large graphs in experiment_complexity/.
 
